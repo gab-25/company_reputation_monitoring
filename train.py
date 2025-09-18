@@ -1,12 +1,10 @@
-import argparse
-
 import pandas as pd
 import torch
 from datasets import Dataset
 from datasets.table import Table
 from sklearn.metrics import accuracy_score, f1_score
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments, Trainer, \
-    DataCollatorWithPadding, pipeline
+    DataCollatorWithPadding
 
 # Carica il modello e il tokenizer
 model_name = "cardiffnlp/twitter-roberta-base-sentiment-latest"
@@ -55,6 +53,10 @@ def train():
     # Dividi il dataset in set di addestramento e validazione
     split_dataset = dataset.train_test_split(test_size=0.1)
 
+    # Aggiorna la mappatura id2label del modello
+    model.config.id2label = {0: "negative", 1: "positive"}
+    model.config.label2id = {"negative": 0, "positive": 1}
+
     # Definisci una funzione per tokenizzare il testo
     # Tokenizzare significa convertire il testo in un formato numerico che il modello può capire
     def tokenize_function(examples):
@@ -72,8 +74,6 @@ def train():
         per_device_eval_batch_size=64,
         warmup_steps=500,  # Numero di step di "riscaldamento" per il learning rate
         weight_decay=0.01,
-        logging_dir='./logs',
-        logging_steps=10,
         eval_strategy="epoch"  # Valuta le performance alla fine di ogni epoca
     )
 
@@ -103,26 +103,5 @@ def train():
     print(f"F1 Score: {f1}")
 
 
-def analyze(text: str) -> dict[str, float]:
-    """
-    Analizza il testo e restituisce un dizionario con le classifiche.
-    """
-    # Inizializza la pipeline con il tuo modello addestrato e il tokenizer
-    # Assicurati che il percorso in "model" sia quello dove hai salvato il modello
-    model_path = "./results"
-    sentiment_pipeline = pipeline("sentiment-analysis", model=model_path, tokenizer=model_path)
-
-    # Esegui una previsione
-    result = sentiment_pipeline(text)
-
-    # Il risultato sarà una lista di dizionari con label e score
-    return result
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--train', action='store_true', help='Train the model')
-    args = parser.parse_args()
-
-    if args.train:
-        train()
+if __name__ == '__main__':
+    train()
