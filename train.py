@@ -8,7 +8,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer, Trai
 
 # Carica il modello e il tokenizer
 model_name = "cardiffnlp/twitter-roberta-base-sentiment-latest"
-model = AutoModelForSequenceClassification.from_pretrained(model_name)
+model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2, ignore_mismatched_sizes=True)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
