@@ -1,7 +1,7 @@
 name: python-app.yml
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   build:
