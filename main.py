@@ -1,7 +1,9 @@
 import os
+import time
 
 import torch
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
+from prometheus_client import generate_latest, Counter, Histogram, CONTENT_TYPE_LATEST
 from pydantic import BaseModel
 from torch import softmax
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -10,6 +12,10 @@ DEV_MODE = os.getenv("DEV_MODE", "false") == "true"
 print(f"DEV_MODE: {DEV_MODE}")
 
 app = FastAPI()
+
+# Definisci le metriche
+REQUEST_COUNT = Counter('model_requests_total', 'Total requests', ['status'])
+REQUEST_DURATION = Histogram('model_request_duration_seconds', 'Request duration')
 
 # Carica il modello e il tokenizer
 model_name = "Gab-25/company_reputation" if DEV_MODE == False else "./results/checkpoint-465"
@@ -36,22 +42,36 @@ async def analize(body: AnalizeBody):
     """
     Analizza il testo e restituisce un dizionario con le classifiche.
     """
-    # Tokenizza il testo
-    inputs = tokenizer(body.text, return_tensors="pt", truncation=True, padding=True).to(device)
+    start_time = time.time()
+    try:
+        # Tokenizza il testo
+        inputs = tokenizer(body.text, return_tensors="pt", truncation=True, padding=True).to(device)
 
-    # Esegue la predizione senza calcolo del gradiente
-    with torch.no_grad():
-        outputs = model(**inputs)
+        # Esegue la predizione senza calcolo del gradiente
+        with torch.no_grad():
+            outputs = model(**inputs)
 
-    # Ottiene i logits (output grezzo prima dell'attivazione)
-    logits = outputs.logits
+        # Ottiene i logits (output grezzo prima dell'attivazione)
+        logits = outputs.logits
 
-    # Applica softmax per convertire i logits in probabilità
-    probabilities = softmax(logits, dim=1)[0]  # Ottiene le probabilità per il primo (e unico) elemento nel batch
+        # Applica softmax per convertire i logits in probabilità
+        probabilities = softmax(logits, dim=1)[0]  # Ottiene le probabilità per il primo (e unico) elemento nel batch
 
-    # Prepara il risultato, includendo i punteggi per tutte le etichette per completezza
-    all_scores = []
-    for i, score in enumerate(probabilities):
-        all_scores.append({"label": model.config.id2label[i], "score": score.item()})
+        # Prepara il risultato, includendo i punteggi per tutte le etichette per completezza
+        all_scores = []
+        for i, score in enumerate(probabilities):
+            all_scores.append({"label": model.config.id2label[i], "score": score.item()})
 
-    return all_scores
+        REQUEST_COUNT.labels(status='success').inc()
+
+        return all_scores
+    except Exception as e:
+        REQUEST_COUNT.labels(status='error').inc()
+        raise
+    finally:
+        REQUEST_DURATION.observe(time.time() - start_time)
+
+
+@app.get('/metrics')
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
