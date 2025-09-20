@@ -26,11 +26,11 @@ jobs:
       - name: Train model
         run: |
           python train.py
-      - name: Test with pytest
-        run: |
-          pytest
       - name: Deploy to Hugging Face
         run: |
           pip install -U "huggingface_hub[cli]"
           hf auth login --token ${{ secrets.HF_TOKEN }}
           hf upload Gab-25/company_reputation ./results/checkpoint-465/
+      - name: Test with pytest
+        run: |
+          pytest

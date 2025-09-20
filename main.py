@@ -32,7 +32,7 @@ async def root():
 
 
 @app.post("/analize")
-async def sentiment(body: AnalizeBody):
+async def analize(body: AnalizeBody):
     """
     Analizza il testo e restituisce un dizionario con le classifiche.
     """
